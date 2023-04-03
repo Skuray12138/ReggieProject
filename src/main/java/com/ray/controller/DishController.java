@@ -15,6 +15,7 @@ import com.ray.service.DishService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -37,6 +38,7 @@ public class DishController {
 
     @Autowired
     private RedisTemplate redisTemplate;
+
 
     /**
      * 新增菜品
@@ -133,7 +135,7 @@ public class DishController {
 
         List<DishDto> dishDtoList = null;
         // 动态构造key
-        String key = "dish_" + dish.getCategoryId() + "_1" ;//dish_13978443691_1
+        String key = "dish_" + dish.getCategoryId() + "_" + dish.getStatus();//dish_13978443691_1
         //从redis中获取缓存数据
         dishDtoList = (List<DishDto>) redisTemplate.opsForValue().get(key);
         if (dishDtoList != null){
@@ -144,7 +146,7 @@ public class DishController {
 
         LambdaQueryWrapper<Dish> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(dish.getCategoryId() != null,Dish::getCategoryId,dish.getCategoryId());
-        queryWrapper.eq(Dish::getStatus,dish.getStatus());
+        queryWrapper.eq(Dish::getStatus,1);
         queryWrapper.orderByAsc(Dish::getSort).orderByDesc(Dish::getUpdateTime);
         List<Dish> list = dishService.list(queryWrapper);
         dishDtoList = list.stream().map((item) -> {
@@ -192,6 +194,8 @@ public class DishController {
     @PostMapping("/status/{status}")
     public R<String> updateWithStatus(@PathVariable("status") Integer status,@RequestParam List<Long> ids){
         dishService.updateStatus(status,ids);
+        Set keys = redisTemplate.keys("dish_*");
+        redisTemplate.delete(keys);
         return R.success("菜品状态修改成功");
     }
 
